@@ -1,0 +1,4 @@
+[package]
+name = "dcpu16"
+version = "0.1.0"
+authors = ["Gavin Massey <mdk@mystacktrace.org>"]
