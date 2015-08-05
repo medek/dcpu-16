@@ -2,3 +2,15 @@
 name = "dcpu16"
 version = "0.1.0"
 authors = ["Gavin Massey <mdk@mystacktrace.org>"]
+
+[dependencies]
+clap = "0.8.4"
+nom = "0.3.11"
+
+[lib]
+name="dcpu16"
+path="src/lib.rs"
+
+[[bin]]
+name="dcpu_assembler"
+path="src/dcpu_assembler/main.rs"
