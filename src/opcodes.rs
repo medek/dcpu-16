@@ -2,6 +2,10 @@
 use std::fmt::{Display, Formatter, Error};
 use virtual_machine::{VirtualMachine, Register};
 use result::DcpuResult;
+use std::slice::Iter;
+use std::iter::Peekable;
+//use std::slice::Iter;
+
 #[derive(Debug)]
 pub enum Operand {
     Register(Register),

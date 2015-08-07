@@ -5,7 +5,9 @@ pub enum DcpuErrorKind {
     PushInAOp,
     PopInBOp,
     MissingNextWord,
-    ReservedOpcode(u16)
+    ReservedOpcode(u16),
+    EmptyIterator,
+    EmptyInstruction
 }
 
 #[derive(Debug)]
@@ -25,7 +27,11 @@ impl Display for DcpuError {
             DcpuErrorKind::MissingNextWord =>
                 fmt.write_str("Missing next word needed by opcode"),
             DcpuErrorKind::ReservedOpcode(op) =>
-                fmt.write_fmt(format_args!("Reserved opcode found {:01x}", op))
+                fmt.write_fmt(format_args!("Reserved opcode found {:01x}", op)),
+            DcpuErrorKind::EmptyIterator =>
+                fmt.write_str("Someone passed in an empty iterator!"),
+            DcpuErrorKind::EmptyInstruction =>
+                fmt.write_str("0b0000000000000000 isn't a valid instruction!"),
         }
     }
 }
