@@ -118,7 +118,7 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (op, eat) = try!(handle_special_op(inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((op, count))
         },
@@ -126,12 +126,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::SET(b, a), count))
         },
@@ -139,12 +139,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::ADD(b, a), count))
         },
@@ -152,12 +152,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::SUB(b, a), count))
         },
@@ -165,12 +165,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::MUL(b, a), count))
         },
@@ -178,12 +178,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::MLI(b, a), count))
         },
@@ -191,12 +191,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::DIV(b, a), count))
         },
@@ -204,12 +204,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::DVI(b, a), count))
         },
@@ -217,12 +217,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::MOD(b, a), count))
         },
@@ -230,12 +230,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::MDI(b, a), count))
         },
@@ -243,12 +243,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::AND(b, a), count))
         },
@@ -256,12 +256,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::BOR(b, a), count))
         },
@@ -269,12 +269,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::XOR(b, a), count))
         },
@@ -282,12 +282,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::SHR(b, a), count))
         },
@@ -295,12 +295,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::ASR(b, a), count))
         },
@@ -308,12 +308,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::SHL(b, a), count))
         },
@@ -321,12 +321,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFB(b, a), count))
         },
@@ -334,12 +334,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFC(b, a), count))
         },
@@ -347,12 +347,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFE(b, a), count))
         },
@@ -360,12 +360,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFN(b, a), count))
         },
@@ -373,12 +373,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFG(b, a), count))
         },
@@ -386,12 +386,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFA(b, a), count))
         },
@@ -399,12 +399,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFL(b, a), count))
         },
@@ -412,12 +412,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::IFU(b, a), count))
         },
@@ -428,12 +428,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::ADX(b, a), count))
         },
@@ -441,12 +441,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::SBX(b, a), count))
         },
@@ -457,12 +457,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::STI(b, a), count))
         },
@@ -470,12 +470,12 @@ pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(O
             let (a, eat) = try!(get_operand(true, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             let (b, eat) = try!(get_operand(false, inst, itr.peek().cloned()));
             if eat {
 				itr.next();
-				count = count + 1;
+				count += 1;
 			}
             Ok((Opcode::STD(b, a), count))
         }

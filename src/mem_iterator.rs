@@ -13,7 +13,7 @@ impl<'_> MemIterator<'_> {
 impl<'_> Iterator for MemIterator<'_> {
     type Item = &'_ u16;
     fn next(&mut self) -> Option<&'_ u16> {
-        self.curr = self.curr + 1 & self.max;
+        self.curr = (self.curr + 1) & self.max;
         Some(&self.data[self.curr])
     }
 }
