@@ -184,75 +184,75 @@ impl<'r> VirtualMachine {
                 if res > 0xFFFF {
                     self.ex = 1;
                 }
-			},
+            },
             Opcode::SUB(ref b, ref a) => {
-			},
+            },
             Opcode::MUL(ref b, ref a) => {
-			},
+            },
             Opcode::MLI(ref b, ref a) => {
-			},
+            },
             Opcode::DIV(ref b, ref a) => {
-			},
+            },
             Opcode::DVI(ref b, ref a) => {
-			},
+            },
             Opcode::MOD(ref b, ref a) => {
-			},
+            },
             Opcode::MDI(ref b, ref a) => {
-			},
+            },
             Opcode::AND(ref b, ref a) => {
-			},
+            },
             Opcode::BOR(ref b, ref a) => {
-			},
+            },
             Opcode::XOR(ref b, ref a) => {
-			},
+            },
             Opcode::SHR(ref b, ref a) => {
-			},
+            },
             Opcode::ASR(ref b, ref a) => {
-			},
+            },
             Opcode::SHL(ref b, ref a) => {
-			},
+            },
             Opcode::IFB(ref b, ref a) => {
-			},
+            },
             Opcode::IFC(ref b, ref a) => {
-			},
+            },
             Opcode::IFE(ref b, ref a) => {
-			},
+            },
             Opcode::IFN(ref b, ref a) => {
-			},
+            },
             Opcode::IFG(ref b, ref a) => {
-			},
+            },
             Opcode::IFA(ref b, ref a) => {
-			},
+            },
             Opcode::IFL(ref b, ref a) => {
-			},
+            },
             Opcode::IFU(ref b, ref a) => {
-			},
+            },
             Opcode::ADX(ref b, ref a) => {
-			},
+            },
             Opcode::SBX(ref b, ref a) => {
-			},
+            },
             Opcode::STI(ref b, ref a) => {
-			},
+            },
             Opcode::STD(ref b, ref a) => {
-			},
+            },
             Opcode::JSR(ref a) => {
-			},
+            },
             Opcode::INT(ref a) => {
-			},
+            },
             Opcode::IAG(ref a) => {
-			},
+            },
             Opcode::IAS(ref a) => {
-			},
+            },
             Opcode::RFI(ref a) => {
-			},
+            },
             Opcode::IAQ(ref a) => {
-			},
+            },
             Opcode::HWN(ref a) => {
-			},
+            },
             Opcode::HWQ(ref a) => {
-			},
+            },
             Opcode::HWI(ref a) => {
-			},
+            },
         }
         self.cycles = self.cycles + cycles;
         self.pc = self.pc + (count as u16) + 1;

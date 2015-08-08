@@ -111,112 +111,112 @@ impl Display for Opcode {
         match *self {
             Opcode::SET(ref b, ref a) => {
                 fmt.write_fmt(format_args!("SET {}, {}", b, a))
-			},
+            },
             Opcode::ADD(ref b, ref a) => {
                 fmt.write_fmt(format_args!("ADD {}, {}", b, a))
-			},
+            },
             Opcode::SUB(ref b, ref a) => {
                 fmt.write_fmt(format_args!("SUB {}, {}", b, a))
-			},
+            },
             Opcode::MUL(ref b, ref a) => {
                 fmt.write_fmt(format_args!("MUL {}, {}", b, a))
-			},
+            },
             Opcode::MLI(ref b, ref a) => {
                 fmt.write_fmt(format_args!("MLI {}, {}", b, a))
-			},
+            },
             Opcode::DIV(ref b, ref a) => {
                 fmt.write_fmt(format_args!("DIV {}, {}", b, a))
-			},
+            },
             Opcode::DVI(ref b, ref a) => {
                 fmt.write_fmt(format_args!("DVI {}, {}", b, a))
-			},
+            },
             Opcode::MOD(ref b, ref a) => {
                 fmt.write_fmt(format_args!("MOD {}, {}", b, a))
-			},
+            },
             Opcode::MDI(ref b, ref a) => {
                 fmt.write_fmt(format_args!("MDI {}, {}", b, a))
-			},
+            },
             Opcode::AND(ref b, ref a) => {
                 fmt.write_fmt(format_args!("AND {}, {}", b, a))
-			},
+            },
             Opcode::BOR(ref b, ref a) => {
                 fmt.write_fmt(format_args!("BOR {}, {}", b, a))
-			},
+            },
             Opcode::XOR(ref b, ref a) => {
                 fmt.write_fmt(format_args!("XOR {}, {}", b, a))
-			},
+            },
             Opcode::SHR(ref b, ref a) => {
                 fmt.write_fmt(format_args!("SHR {}, {}", b, a))
-			},
+            },
             Opcode::ASR(ref b, ref a) => {
                 fmt.write_fmt(format_args!("ASR {}, {}", b, a))
-			},
+            },
             Opcode::SHL(ref b, ref a) => {
                 fmt.write_fmt(format_args!("SHL {}, {}", b, a))
-			},
+            },
             Opcode::IFB(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFB {}, {}", b, a))
-			},
+            },
             Opcode::IFC(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFC {}, {}", b, a))
-			},
+            },
             Opcode::IFE(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFE {}, {}", b, a))
-			},
+            },
             Opcode::IFN(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFN {}, {}", b, a))
-			},
+            },
             Opcode::IFG(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFG {}, {}", b, a))
-			},
+            },
             Opcode::IFA(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFA {}, {}", b, a))
-			},
+            },
             Opcode::IFL(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFL {}, {}", b, a))
-			},
+            },
             Opcode::IFU(ref b, ref a) => {
                 fmt.write_fmt(format_args!("IFU {}, {}", b, a))
-			},
+            },
             Opcode::ADX(ref b, ref a) => {
                 fmt.write_fmt(format_args!("ADX {}, {}", b, a))
-			},
+            },
             Opcode::SBX(ref b, ref a) => {
                 fmt.write_fmt(format_args!("SBX {}, {}", b, a))
-			},
+            },
             Opcode::STI(ref b, ref a) => {
                 fmt.write_fmt(format_args!("STI {}, {}", b, a))
-			},
+            },
             Opcode::STD(ref b, ref a) => {
                 fmt.write_fmt(format_args!("STD {}, {}", b, a))
-			},
+            },
             Opcode::JSR(ref a) => {
                 fmt.write_fmt(format_args!("JSR {}", a))
-			},
+            },
             Opcode::INT(ref a) => {
                 fmt.write_fmt(format_args!("INT {}", a))
-			},
+            },
             Opcode::IAG(ref a) => {
                 fmt.write_fmt(format_args!("IAG {}", a))
-			},
+            },
             Opcode::IAS(ref a) => {
                 fmt.write_fmt(format_args!("IAS {}", a))
-			},
+            },
             Opcode::RFI(ref a) => {
                 fmt.write_fmt(format_args!("RFI {}", a))
-			},
+            },
             Opcode::IAQ(ref a) => {
                 fmt.write_fmt(format_args!("IAQ {}", a))
-			},
+            },
             Opcode::HWN(ref a) => {
                 fmt.write_fmt(format_args!("HWN {}", a))
-			},
+            },
             Opcode::HWQ(ref a) => {
                 fmt.write_fmt(format_args!("HWQ {}", a))
-			},
+            },
             Opcode::HWI(ref a) => {
                 fmt.write_fmt(format_args!("HWI {}", a))
-			}
+            }
         }
     }
 }
