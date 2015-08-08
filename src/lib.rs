@@ -3,6 +3,7 @@ mod opcodes;
 mod assembler;
 mod disassemble;
 mod result;
+mod mem_iterator;
 
 pub use virtual_machine::*;
 pub use opcodes::*;

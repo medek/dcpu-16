@@ -1,9 +1,11 @@
-
+use std::fmt::{Display, Formatter, Error};
 use opcodes::{Opcode, Operand};
 use result::{DcpuResult, DcpuError, DcpuErrorKind};
 use disassemble::disassm_one;
+use mem_iterator::MemIterator;
 
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub enum Register {
     A = 0,
     B,
@@ -13,6 +15,21 @@ pub enum Register {
     Z,
     I,
     J
+}
+
+impl Display for Register {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        match *self {
+            Register::A => fmt.write_str("A"),
+            Register::B => fmt.write_str("B"),
+            Register::C => fmt.write_str("C"),
+            Register::X => fmt.write_str("X"),
+            Register::Y => fmt.write_str("Y"),
+            Register::Z => fmt.write_str("Z"),
+            Register::I => fmt.write_str("I"),
+            Register::J => fmt.write_str("J")
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -50,16 +67,6 @@ impl<'r> VirtualMachine {
             dead_zone: 0,
             cycles: 0
         }
-    }
-
-    fn get_instruction(&'r mut self) -> (u16, Option<u16>, Option<u16>) {
-        let mut pc = self.pc as usize;
-        let inst = (*(self.ram))[pc & 0xFFFF];
-        pc = pc + 1;
-        let next_a = Some((*(self.ram))[pc & 0xFFFF]);
-        pc = pc + 1;
-        let next_b = Some((*(self.ram))[pc & 0xFFFF]);
-        (inst, next_a, next_b)
     }
 
     fn resolve_memory_read(&mut self, op: &Operand) -> DcpuResult<(u16, usize)> {
@@ -134,7 +141,7 @@ impl<'r> VirtualMachine {
             Operand::LiteralDeRef(n) => {
                 Ok((&mut (*(self.ram))[n as usize], 1))
             },
-            Operand::Literal(n) => {
+            Operand::Literal(_) => {
                 Ok((&mut self.dead_zone, 1))
             },
             Operand::Pop => {
@@ -147,10 +154,18 @@ impl<'r> VirtualMachine {
         }
     }
 
+    pub fn get_instruction(&'r mut self) -> DcpuResult<(Opcode, usize)> {
+        let mut itr = MemIterator::new(&*self.ram, self.pc as usize, 0xFFFF).peekable();
+        let inst = match itr.next() {
+            Some(i) => *i,
+            None => return Err(DcpuError{reason: DcpuErrorKind::EmptyIterator})
+        };
+        disassm_one(inst, &mut itr)
+    }
+
     pub fn step(&'r mut self) -> DcpuResult<usize> {
-        let (inst, next_a, next_b) = self.get_instruction();
-        let (op, count) = try!(disassm_one(inst, next_a.as_ref(), next_b.as_ref()));
         let mut cycles:usize = 0;
+        let (op, count) = try!(self.get_instruction());
         match op {
             Opcode::SET(ref b, ref a) => {
                 let (src, c) = try!(self.resolve_memory_read(a));
