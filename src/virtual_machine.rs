@@ -57,7 +57,7 @@ fn normalize_stack_address(n: u16) -> u16 {
 }
 
 impl<'r> VirtualMachine {
-    pub fn new() -> VirtualMachine {
+    pub fn new() -> Self {
         VirtualMachine{
             registers: vec![0u16; 8].into_boxed_slice(),
             stack: vec![0u16; 256].into_boxed_slice(),
@@ -608,17 +608,17 @@ impl<'r> VirtualMachine {
         Ok(cycles)
     }
 
-    pub fn set_pc(&mut self, pc: u16) -> &mut VirtualMachine {
+    pub fn set_pc(mut self, pc: u16) -> Self {
         self.pc = pc;
         self
     }
 
-    pub fn set_sp(&mut self, sp: u16) -> &mut VirtualMachine {
+    pub fn set_sp(mut self, sp: u16) -> Self {
         self.sp = sp;
         self
     }
 
-    pub fn load_program(&mut self, program: &Vec<u16>, org: usize) -> &mut VirtualMachine {
+    pub fn load_program(mut self, program: &Vec<u16>, org: usize) -> Self {
         self.reset();
         let mut i = org;
 
@@ -629,7 +629,7 @@ impl<'r> VirtualMachine {
         self
     }
 
-    pub fn attach_hardware<H>(&mut self, hardware: H) -> &mut VirtualMachine where H: Hardware + Sized + 'static {
+    pub fn attach_hardware<H>(mut self, hardware: H) -> Self where H: Hardware + Sized + 'static {
         self.hardware.push(Box::new(hardware));
         self
     }
