@@ -1,4 +1,4 @@
-mod core;
+pub mod core;
 mod clock;
 
 pub use self::core::*;

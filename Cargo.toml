@@ -6,7 +6,7 @@ authors = ["Gavin Massey <mdk@mystacktrace.org>"]
 [dependencies]
 clap = "0.8.4"
 nom = "0.3.11"
-
+time = "0.1.32"
 [lib]
 name="dcpu16"
 path="src/lib.rs"

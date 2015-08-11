@@ -6,7 +6,7 @@ pub struct MemIterator<'_> {
 
 impl<'_> MemIterator<'_> {
     pub fn new(src: &'_ Vec<u16>, skip: usize, max: usize) -> MemIterator<'_> {
-        MemIterator{ curr: skip, max: max, data: src}
+        MemIterator{ curr: skip & max, max: max, data: src}
     }
 }
 

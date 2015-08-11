@@ -1,6 +1,6 @@
 extern crate dcpu16;
 use dcpu16::VirtualMachine;
-use dcpu16::hardware::Clock;
+use dcpu16::hardware::RealtimeClock;
 
 const disasm:[u16;27] = [0x7c01, 0x0030, 0x7fc1, 0x0020, 0x1000,
                             0x7803, 0x1000, 0xc413, 0x7f81, 0x0019,
@@ -11,11 +11,10 @@ const disasm:[u16;27] = [0x7c01, 0x0030, 0x7fc1, 0x0020, 0x1000,
 
 fn main() {
     let mut vm = VirtualMachine::new()
-        .attach_hardware(Clock::new())
+        .attach_hardware(RealtimeClock::new())
         .load_program(&disasm.to_vec(), 0);
 
     vm.step();
     vm.step();
-    println!("{:?}", vm);
+    println!("{:?}", vm.get_registers());
 }
-

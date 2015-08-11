@@ -1,3 +1,5 @@
+extern crate time;
+
 mod virtual_machine;
 mod opcodes;
 mod assembler;

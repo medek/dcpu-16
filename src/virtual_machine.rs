@@ -3,7 +3,7 @@ use opcodes::{Opcode, Operand};
 use result::{DcpuResult, DcpuError, DcpuErrorKind};
 use disassemble::disassm_one;
 use mem_iterator::MemIterator;
-use hardware::Hardware;
+use hardware::{Hardware, RealtimeClock};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -33,6 +33,8 @@ impl Display for Register {
     }
 }
 
+type Hw = Hardware + Sized;
+
 #[derive(Debug)]
 pub struct VirtualMachine {
     registers: Box<[u16]>,
@@ -44,7 +46,8 @@ pub struct VirtualMachine {
     ex: u16,
     dead_zone: u16, //where writing to literals goes to die
     cycles: usize,
-    hardware: Vec<Box<Hardware>>
+    clock_rate: usize,
+    hardware: Vec<Box<Hw>>
 }
 
 fn normalize_stack_address(n: u16) -> u16 {
@@ -68,7 +71,8 @@ impl<'r> VirtualMachine {
             ex: 0,
             dead_zone: 0,
             cycles: 0,
-            hardware: Vec::<Box<Hardware>>::new()
+            clock_rate: 10000, // default to 10KHz
+            hardware: Vec::<Box<Hw>>::new()
         }
     }
 
@@ -634,24 +638,47 @@ impl<'r> VirtualMachine {
         self
     }
 
-    pub fn get_ram(&'r mut self) -> &'r Vec<u16> {
-        &*self.ram
+    pub fn get_ram(&'r mut self) -> &'r mut Vec<u16> {
+        &mut *self.ram
     }
 
-    pub fn get_registers(&'r mut self) -> &'r [u16] {
-        &*self.registers
+    pub fn get_registers(&'r mut self) -> &'r mut [u16] {
+        &mut *self.registers
     }
 
-    pub fn get_pc(&'r mut self) -> &'r u16 {
-        &self.pc
+    pub fn get_pc(&'r mut self) -> &'r mut u16 {
+        &mut self.pc
     }
 
-    pub fn get_ex(&'r mut self) -> &'r u16 {
-        &self.ex
+    pub fn get_ex(&'r mut self) -> &'r mut u16 {
+        &mut self.ex
     }
 
-    pub fn get_sp(&'r mut self) -> &'r u16 {
-        &self.sp
+    pub fn get_sp(&'r mut self) -> &'r mut u16 {
+        &mut self.sp
+    }
+
+    pub fn get_clock_rate(&'r self) -> usize {
+        self.clock_rate
+    }
+
+    pub fn clock_rate(mut self, cr: usize) -> Self {
+        self.clock_rate = cr;
+        self
+    }
+
+    pub fn get_cycles(&'r self) -> usize {
+        self.cycles
+    }
+
+    pub fn update_hardware(&'r mut self) {
+        for mut hw in self.hardware.as_ref() {
+            hw.update(self);
+        }
+    }
+
+    pub fn interrupt(&'r mut self, msg: u16) {
+        unimplemented!()
     }
 
     pub fn reset(&'r mut self) {
