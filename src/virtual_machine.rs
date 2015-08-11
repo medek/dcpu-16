@@ -3,7 +3,8 @@ use opcodes::{Opcode, Operand};
 use result::{DcpuResult, DcpuError, DcpuErrorKind};
 use disassemble::disassm_one;
 use mem_iterator::MemIterator;
-use hardware::{Hardware, RealtimeClock};
+use hardware::{Hardware, Hw, RealtimeClock};
+use std::borrow::BorrowMut;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -32,8 +33,6 @@ impl Display for Register {
         }
     }
 }
-
-type Hw = Hardware + Sized;
 
 #[derive(Debug)]
 pub struct VirtualMachine {
@@ -633,8 +632,8 @@ impl<'r> VirtualMachine {
         self
     }
 
-    pub fn attach_hardware<H>(mut self, hardware: H) -> Self where H: Hardware + Sized + 'static {
-        self.hardware.push(Box::new(hardware));
+    pub fn attach_hardware(mut self, hardware: Box<Hw>) -> Self {
+        self.hardware.push(hardware);
         self
     }
 
@@ -671,8 +670,8 @@ impl<'r> VirtualMachine {
         self.cycles
     }
 
-    pub fn update_hardware(&'r mut self) {
-        for mut hw in self.hardware.as_ref() {
+    pub fn update_hardware(&mut self) {
+        for mut hw in self.hardware {
             hw.update(self);
         }
     }

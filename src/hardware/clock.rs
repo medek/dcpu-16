@@ -49,7 +49,7 @@ impl RealtimeClock {
     }
 }
 
-impl Hardware for RealtimeClock {
+impl<'a> Hardware for RealtimeClock {
     fn info(&self) -> &HardwareInfo {
         &self.hw_info
     }
