@@ -38,8 +38,6 @@ pub struct VMExposed {
     registers: Box<[u16]>,
     ram: Box<Vec<u16>>,
     interrupts: Vec<u16>,
-    store_interrupts: bool,
-    in_interrupt: bool,
     cycles: usize,
     clock_rate: usize,
 }
@@ -53,6 +51,7 @@ pub struct VirtualMachine {
     ex: u16,
     dead_zone: u16, //where writing to literals goes to die
     hardware: Vec<Box<Hw>>,
+    in_interrupt: bool,
     iaq: bool,
     on_fire: bool
 }
@@ -75,8 +74,6 @@ impl<'r> VirtualMachine {
                 registers: vec![0u16; 8].into_boxed_slice(),
                 ram: Box::<Vec<u16>>::new(vec![0u16; 65536]),
                 interrupts: Vec::<u16>::new(),
-                store_interrupts: false,
-                in_interrupt: false,
                 cycles: 0,
                 clock_rate: 100000, // default to 100KHz
             },
@@ -91,7 +88,6 @@ impl<'r> VirtualMachine {
             on_fire: false
         }
     }
-
 
     fn push_stack(&mut self, data: u16) {
         self.sp = rollover_dec(self.sp);
@@ -210,7 +206,7 @@ impl<'r> VirtualMachine {
     }
 
     fn handle_interrupts(&'r mut self) -> DcpuResult<usize> {
-        if self.exposed.store_interrupts || self.ia == 0 {
+        if self.ia == 0  || self.iaq {
             return Ok(0)
         }
 
@@ -778,8 +774,8 @@ impl<'r> VirtualMachine {
         }
         self.exposed.cycles = 0;
         self.exposed.interrupts.clear();
-        self.exposed.store_interrupts = false;
-        self.exposed.in_interrupt = false;
+        self.in_interrupt = false;
+        self.iaq = false;
     }
 }
 
