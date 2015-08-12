@@ -3,8 +3,7 @@ use opcodes::{Opcode, Operand};
 use result::{DcpuResult, DcpuError, DcpuErrorKind};
 use disassemble::disassm_one;
 use mem_iterator::MemIterator;
-use hardware::{Hardware, Hw, RealtimeClock};
-use std::borrow::BorrowMut;
+use hardware::{Hardware, Hw};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -35,62 +34,92 @@ impl Display for Register {
 }
 
 #[derive(Debug)]
-pub struct VirtualMachine {
+pub struct VMExposed {
     registers: Box<[u16]>,
-    stack: Box<[u16]>,
     ram: Box<Vec<u16>>,
+    interrupts: Vec<u16>,
+    store_interrupts: bool,
+    in_interrupt: bool,
+    cycles: usize,
+    clock_rate: usize,
+}
+
+#[derive(Debug)]
+pub struct VirtualMachine {
+    exposed: VMExposed,
     pc: u16,
     sp: u16,
     ia: u16,
     ex: u16,
     dead_zone: u16, //where writing to literals goes to die
-    cycles: usize,
-    clock_rate: usize,
-    hardware: Vec<Box<Hw>>
+    hardware: Vec<Box<Hw>>,
+    iaq: bool,
+    on_fire: bool
 }
 
-fn normalize_stack_address(n: u16) -> u16 {
-    if n < 256 {
-        n
+fn rollover_inc(i: u16) -> u16 {
+    ((i as u32 + 1) & 0xFFFF) as u16
+}
+
+fn rollover_dec(i: u16) -> u16 {
+    if i == 0 {
+        return 0xFFFF
     }
-    else {
-        255 - (n & 0xFF)
-    }
+    i - 1
 }
 
 impl<'r> VirtualMachine {
     pub fn new() -> Self {
         VirtualMachine{
-            registers: vec![0u16; 8].into_boxed_slice(),
-            stack: vec![0u16; 256].into_boxed_slice(),
-            ram: Box::<Vec<u16>>::new(vec![0u16; 65536]),
+            exposed: VMExposed {
+                registers: vec![0u16; 8].into_boxed_slice(),
+                ram: Box::<Vec<u16>>::new(vec![0u16; 65536]),
+                interrupts: Vec::<u16>::new(),
+                store_interrupts: false,
+                in_interrupt: false,
+                cycles: 0,
+                clock_rate: 100000, // default to 100KHz
+            },
             pc: 0,
-            sp: 255,
+            sp: 0,
             ia: 0,
             ex: 0,
             dead_zone: 0,
-            cycles: 0,
-            clock_rate: 10000, // default to 10KHz
-            hardware: Vec::<Box<Hw>>::new()
+            hardware: Vec::<Box<Hw>>::new(),
+            iaq: false,
+            in_interrupt: false,
+            on_fire: false
         }
+    }
+
+
+    fn push_stack(&mut self, data: u16) {
+        self.sp = rollover_dec(self.sp);
+        self.exposed.ram[self.sp as usize] = data;
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let ret = self.exposed.ram[self.sp as usize];
+        self.sp = rollover_inc(self.sp);
+        ret
     }
 
     fn resolve_memory_read(&mut self, op: &Operand) -> DcpuResult<(u16, usize)> {
         match *op {
-            Operand::Register(reg) => Ok(((*(self.registers))[reg as usize], 0)),
+            Operand::Register(reg) => Ok(((*(self.exposed.registers))[reg as usize], 0)),
             Operand::RegisterDeRef(reg) => {
-                let addr = (*(self.registers))[reg as usize];
-                Ok(((*(self.ram))[addr as usize], 0))
+                let addr = (*(self.exposed.registers))[reg as usize];
+                Ok(((*(self.exposed.ram))[addr as usize], 0))
             },
             Operand::RegisterPlusDeRef(reg, plus) => {
-                let addr = (*(self.registers))[reg as usize] + plus;
-                Ok(((*(self.ram))[addr as usize], 1))
+                let addr = (*(self.exposed.registers))[reg as usize] + plus;
+                Ok(((*(self.exposed.ram))[addr as usize], 1))
             },
             Operand::Peek => {
-                Ok(((*(self.stack))[normalize_stack_address(self.sp) as usize], 0))
+                Ok((self.exposed.ram[self.sp as usize], 0))
             },
             Operand::Pick(n) => {
-                Ok(((*(self.stack))[normalize_stack_address(self.sp + n) as usize], 1))
+                Ok((self.exposed.ram[((self.sp + n) & 0xFFFF) as usize], 1))
             },
             Operand::Pc => {
                 Ok((self.pc, 0))
@@ -102,14 +131,13 @@ impl<'r> VirtualMachine {
                 Ok((self.ex, 0))
             },
             Operand::LiteralDeRef(n) => {
-                Ok(((*(self.ram))[n as usize], 1))
+                Ok(((*(self.exposed.ram))[n as usize], 1))
             },
             Operand::Literal(n) => {
                 Ok((n, 1))
             },
             Operand::Pop => {
-                let n = (*(self.stack))[normalize_stack_address(self.sp) as usize];
-                self.sp = self.sp + 1;
+                let n = self.pop_stack();
                 Ok((n, 0))
             },
             Operand::Push => {
@@ -120,20 +148,20 @@ impl<'r> VirtualMachine {
 
     fn resolve_memory_write(&'r mut self, op: &Operand) -> DcpuResult<(&'r mut u16, usize)> {
         match *op {
-            Operand::Register(reg) => Ok((&mut (*(self.registers))[reg as usize], 0)),
+            Operand::Register(reg) => Ok((&mut (*(self.exposed.registers))[reg as usize], 0)),
             Operand::RegisterDeRef(reg) => {
-                let addr = (*(self.registers))[reg as usize];
-                Ok((&mut(*(self.ram))[addr as usize], 0))
+                let addr = (*(self.exposed.registers))[reg as usize];
+                Ok((&mut(*(self.exposed.ram))[addr as usize], 0))
             },
             Operand::RegisterPlusDeRef(reg, plus) => {
-                let addr = (*(self.registers))[reg as usize] + plus;
-                Ok((&mut (*(self.ram))[addr as usize], 1))
+                let addr = (*(self.exposed.registers))[reg as usize] + plus;
+                Ok((&mut (*(self.exposed.ram))[addr as usize], 1))
             },
             Operand::Peek => {
-                Ok((&mut (*(self.stack))[normalize_stack_address(self.sp) as usize], 0))
+                Ok((&mut self.exposed.ram[self.sp as usize], 0))
             },
             Operand::Pick(n) => {
-                Ok((&mut (*(self.stack))[normalize_stack_address(self.sp + n) as usize], 1))
+                Ok((&mut self.exposed.ram[((self.sp as u32 + n as u32) & 0xFFFF) as usize], 1))
             },
             Operand::Pc => {
                 Ok((&mut self.pc, 0))
@@ -145,7 +173,7 @@ impl<'r> VirtualMachine {
                 Ok((&mut self.ex, 0))
             },
             Operand::LiteralDeRef(n) => {
-                Ok((&mut (*(self.ram))[n as usize], 1))
+                Ok((&mut (*(self.exposed.ram))[n as usize], 1))
             },
             Operand::Literal(_) => {
                 Ok((&mut self.dead_zone, 1))
@@ -154,8 +182,9 @@ impl<'r> VirtualMachine {
                 Err(DcpuError{reason: DcpuErrorKind::PopInBOp})
             },
             Operand::Push => {
-                self.sp = self.sp + 1;
-                Ok((&mut (*(self.stack))[normalize_stack_address(self.sp) as usize], 0))
+                self.sp = ((self.sp as u32 - 1) & 0xFFFF) as u16;
+                let ret = &mut self.exposed.ram[self.sp as usize];
+                Ok((ret, 0))
             }
         }
     }
@@ -163,7 +192,7 @@ impl<'r> VirtualMachine {
     fn skip(&'r mut self, off: usize) -> DcpuResult<(usize, usize)> {
         let mut skipped:usize = 0;
         let mut count:usize = 0;
-        let mut itr = MemIterator::new(&*self.ram, off + self.pc as usize, 0xFFFF).peekable();
+        let mut itr = MemIterator::new(&*self.exposed.ram, off + self.pc as usize, 0xFFFF).peekable();
 
         loop {
             let inst = match itr.next() {
@@ -171,7 +200,7 @@ impl<'r> VirtualMachine {
                 None => return Err(DcpuError{reason: DcpuErrorKind::EmptyIterator})
             };
             let o = inst & 0x1f;
-            let (op, c) = try!(disassm_one(inst, &mut itr));
+            let (_, c) = try!(disassm_one(inst, &mut itr));
             count += c + 1;
             skipped += 1;
             if o < 0x10 && o > 0x17 { break; }
@@ -180,8 +209,32 @@ impl<'r> VirtualMachine {
         Ok((skipped, count))
     }
 
+    fn handle_interrupts(&'r mut self) -> DcpuResult<usize> {
+        if self.exposed.store_interrupts || self.ia == 0 {
+            return Ok(0)
+        }
+
+        if self.on_fire {
+            return Err(DcpuError{reason: DcpuErrorKind::OnFire})
+        }
+
+        if self.exposed.interrupts.len() == 0 {
+            return Ok(0)
+        }
+
+        let int = self.exposed.interrupts.remove(0);
+        let a = self.exposed.registers[Register::A as usize];
+        let pc = self.pc;
+        self.push_stack(pc);
+        self.push_stack(a);
+        self.pc = self.ia;
+        self.exposed.registers[Register::A as usize] = int;
+        self.in_interrupt = true;
+        self.step()
+    }
+
     fn get_instruction(&'r mut self) -> DcpuResult<(Opcode, usize)> {
-        let mut itr = MemIterator::new(&*self.ram, self.pc as usize, 0xFFFF).peekable();
+        let mut itr = MemIterator::new(&*self.exposed.ram, self.pc as usize, 0xFFFF).peekable();
         let inst = match itr.next() {
             Some(i) => *i,
             None => return Err(DcpuError{reason: DcpuErrorKind::EmptyIterator})
@@ -556,8 +609,8 @@ impl<'r> VirtualMachine {
                     cycles += c + 2;
                     *dst = src;
                 }
-                self.registers[Register::I as usize] += 1;
-                self.registers[Register::J as usize] += 1;
+                self.exposed.registers[Register::I as usize] += 1;
+                self.exposed.registers[Register::J as usize] += 1;
             },
             Opcode::STD(ref b, ref a) => {
                 {
@@ -567,47 +620,74 @@ impl<'r> VirtualMachine {
                     cycles += c + 2;
                     *dst = src;
                 }
-                self.registers[Register::I as usize] -= 1;
-                self.registers[Register::J as usize] -= 1;
+                self.exposed.registers[Register::I as usize] -= 1;
+                self.exposed.registers[Register::J as usize] -= 1;
             },
             Opcode::JSR(ref a) => {
-                let mut x:u32 = (self.pc as u32 + count as u32 + 1) & 0xFFFF;
-                {
-                    let (src, c) = try!(self.resolve_memory_read(a));
-                    cycles += c + 3;
-                    let (dst, _) = try!(self.resolve_memory_write(&Operand::Push));
-                    *dst = x as u16;
-                    x = src as u32;
-                }
-                self.pc = x as u16;
+                let x:u16 = ((self.pc as u32 + count as u32 + 1) & 0xFFFF) as u16;
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 3;
+                self.push_stack(x);
+                self.pc = src;
             },
             Opcode::INT(ref a) => {
-                unimplemented!()
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 4;
+                self.interrupt(src);
             },
             Opcode::IAG(ref a) => {
-                unimplemented!()
+                let ia:u16 = self.ia;
+                let (dst, c) = try!(self.resolve_memory_write(a));
+                cycles += c + 1;
+                *dst = ia;
             },
             Opcode::IAS(ref a) => {
-                unimplemented!()
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 1;
+                self.ia = src;
             },
-            Opcode::RFI(ref a) => {
-                unimplemented!()
+            Opcode::RFI(_) => {
+                self.iaq = false;
+                self.exposed.registers[Register::A as usize] = self.pop_stack();
+                self.pc = self.pop_stack();
+                self.in_interrupt = false;
+                cycles += 3;
             },
             Opcode::IAQ(ref a) => {
-                unimplemented!()
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 2;
+                self.iaq = src != 0;
             },
             Opcode::HWN(ref a) => {
-                unimplemented!()
+                let hw_count:u16 = self.hardware.len() as u16;
+                let (dst, c) = try!(self.resolve_memory_write(a));
+                cycles += c + 2;
+                *dst = hw_count;
             },
             Opcode::HWQ(ref a) => {
-                unimplemented!()
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 4;
+                if (src as usize) < self.hardware.len() {
+                    let hw_info = self.hardware[src as usize].info();
+                    self.exposed.registers[Register::A as usize] = (hw_info.model & 0xFFFF) as u16;
+                    self.exposed.registers[Register::B as usize] = (hw_info.model >> 16) as u16;
+                    self.exposed.registers[Register::C as usize] = hw_info.version;
+                    self.exposed.registers[Register::X as usize] = (hw_info.manufacturer & 0xFFFF) as u16;
+                    self.exposed.registers[Register::Y as usize] = (hw_info.manufacturer >> 16) as u16;
+                }
             },
             Opcode::HWI(ref a) => {
-                unimplemented!()
+                let (src, c) = try!(self.resolve_memory_read(a));
+                cycles += c + 4;
+                cycles += self.hardware[src as usize].hardware_interrupt(&mut self.exposed);
             },
         }
-        self.cycles = self.cycles + cycles;
+        self.exposed.cycles += cycles;
         self.pc = ((self.pc as u32 + (count as u32) + 1) & 0xFFFF) as u16;
+
+        if !self.in_interrupt {
+            cycles += try!(self.handle_interrupts());
+        }
         Ok(cycles)
     }
 
@@ -626,23 +706,26 @@ impl<'r> VirtualMachine {
         let mut i = org;
 
         for word in program {
-            self.ram[i] = *word;
+            self.exposed.ram[i] = *word;
             i = i + 1;
         }
         self
     }
 
     pub fn attach_hardware(mut self, hardware: Box<Hw>) -> Self {
+        if self.hardware.len() == 0xFFFF {
+            return self
+        }
         self.hardware.push(hardware);
         self
     }
 
     pub fn get_ram(&'r mut self) -> &'r mut Vec<u16> {
-        &mut *self.ram
+        &mut *self.exposed.ram
     }
 
     pub fn get_registers(&'r mut self) -> &'r mut [u16] {
-        &mut *self.registers
+        &mut *self.exposed.registers
     }
 
     pub fn get_pc(&'r mut self) -> &'r mut u16 {
@@ -658,26 +741,28 @@ impl<'r> VirtualMachine {
     }
 
     pub fn get_clock_rate(&'r self) -> usize {
-        self.clock_rate
+        self.exposed.clock_rate
     }
 
     pub fn clock_rate(mut self, cr: usize) -> Self {
-        self.clock_rate = cr;
+        self.exposed.clock_rate = cr;
         self
     }
 
     pub fn get_cycles(&'r self) -> usize {
-        self.cycles
+        self.exposed.cycles
     }
 
     pub fn update_hardware(&mut self) {
-        for mut hw in self.hardware {
-            hw.update(self);
+        for mut hw in &mut self.hardware {
+            hw.update(&mut self.exposed);
         }
     }
 
     pub fn interrupt(&'r mut self, msg: u16) {
-        unimplemented!()
+        if self.ia != 0 && self.on_fire == false {
+            self.exposed.interrupt(msg);
+        }
     }
 
     pub fn reset(&'r mut self) {
@@ -685,15 +770,60 @@ impl<'r> VirtualMachine {
         self.sp = 0;
         self.ia = 0;
         self.ex = 0;
-        for b in (*self.registers).iter_mut() {
+        for b in (*self.exposed.registers).iter_mut() {
             *b = 0;
         }
-        for b in (*self.ram).iter_mut() {
+        for b in (*self.exposed.ram).iter_mut() {
             *b = 0;
         }
-        for b in (*self.stack).iter_mut() {
-            *b = 0;
+        self.exposed.cycles = 0;
+        self.exposed.interrupts.clear();
+        self.exposed.store_interrupts = false;
+        self.exposed.in_interrupt = false;
+    }
+}
+
+impl VMExposed {
+    pub fn interrupt(&mut self, msg: u16) {
+        self.interrupts.push(msg);
+    }
+
+    pub fn get_cycles(&self) -> usize {
+        self.cycles
+    }
+
+    pub fn get_clock_rate(&self) -> usize {
+        self.clock_rate
+    }
+
+    // the cycles I'm using are probably very *very* wrong!
+
+    pub fn read_register(&self, reg: Register) -> (u16, usize) {
+        (self.registers[reg as usize], 2) //SET [NEXT], REG
+    }
+
+    pub fn write_register(&mut self, reg: Register, data: u16) -> usize {
+        self.registers[reg as usize] = data;
+        2 //SET REG, LITERAL
+    }
+
+    pub fn read_ram<'r> (&'r mut self, pos: usize, size: usize) -> DcpuResult<(&'r [u16], usize)> {
+        if pos + size > 0xFFFF {
+            return Err(DcpuError{reason: DcpuErrorKind::OutOfBoundsMemory});
         }
+        Ok((&self.ram[(pos & 0xFFFF) .. (size & 0xFFFF)], size * 3))
+    }
+
+    pub fn write_ram(&mut self, mut pos: usize, data: &[u16], size: usize) -> usize {
+        let mut i = 0;
+        pos = pos & 0xFFFF;
+        loop {
+            self.ram[pos] = data[i];
+            pos = (pos + 1) & 0xFFFF;
+            i += 1;
+            if i == size { break; }
+        }
+        i * 3 //SET [NEXT], LITERAL
     }
 }
 

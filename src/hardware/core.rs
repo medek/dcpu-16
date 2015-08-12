@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter, Error};
-use super::super::virtual_machine::VirtualMachine;
+use super::super::virtual_machine::VMExposed;
 #[derive(Debug)]
 pub struct HardwareInfo {
     pub manufacturer:u32,
@@ -10,8 +10,8 @@ pub struct HardwareInfo {
 pub type Hw = Hardware + Sized;
 pub trait Hardware {
     fn info(&self) -> &HardwareInfo;
-    fn hardware_interrupt(&mut self, u16, &mut [u16], &mut [u16]) -> usize;
-    fn update(&mut self, &mut VirtualMachine);
+    fn hardware_interrupt(&mut self, &mut VMExposed) -> usize;
+    fn update(&mut self, &mut VMExposed);
 }
 
 impl Debug for Hardware + Sized {

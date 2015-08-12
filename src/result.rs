@@ -7,7 +7,9 @@ pub enum DcpuErrorKind {
     MissingNextWord,
     ReservedOpcode(u16),
     EmptyIterator,
-    EmptyInstruction
+    EmptyInstruction,
+    OutOfBoundsMemory,
+    OnFire
 }
 
 #[derive(Debug)]
@@ -32,6 +34,10 @@ impl Display for DcpuError {
                 fmt.write_str("Someone passed in an empty iterator!"),
             DcpuErrorKind::EmptyInstruction =>
                 fmt.write_str("0b0000000000000000 isn't a valid instruction!"),
+            DcpuErrorKind::OutOfBoundsMemory =>
+                fmt.write_str("hardware tried to read too much ram!"),
+            DcpuErrorKind::OnFire =>
+                fmt.write_str("shit's on fire, yo!")
         }
     }
 }

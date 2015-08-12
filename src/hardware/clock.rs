@@ -1,82 +1,65 @@
-use super::super::virtual_machine::{VirtualMachine, Register};
+use super::super::virtual_machine::{VMExposed, Register};
 use self::super::core::{Hardware, HardwareInfo};
-use time::{Timespec, precise_time_s};
 
-#[derive(Debug)]
-pub struct RealtimeClock {
+pub struct Clock {
     hw_info: HardwareInfo,
-    clock_rate: u16,
-    last_time: f64,
-    last_interrupt: f64,
-    interrupt: u16,
-}
-
-pub struct VirtualClock {
-    hw_info: HardwareInfo,
-    ticks: u16,
     clock_rate: u16,
     last_cycles: usize,
     interrupt: u16,
+    last_interrupt: usize
 }
 
-impl VirtualClock {
-    pub fn new() -> VirtualClock {
-        VirtualClock { hw_info: HardwareInfo {
+impl Clock {
+    pub fn new() -> Clock {
+        Clock { hw_info: HardwareInfo {
                 manufacturer: 0x904b3115,
                 model: 0x12d0b402,
                 version: 0x0001
             },
-            ticks: 0,
             clock_rate: 0,
             last_cycles: 0,
-            interrupt: 0
+            interrupt: 0,
+            last_interrupt: 0
         }
     }
 }
 
-impl RealtimeClock {
-    pub fn new() -> RealtimeClock {
-        RealtimeClock { hw_info: HardwareInfo {
-                manufacturer: 0x904b3115,
-                model: 0x12d0b402,
-                version: 0x0001
-            },
-            clock_rate: 0,
-            last_time: 0.0,
-            last_interrupt: 0.0,
-            interrupt: 0
-        }
-    }
-}
-
-impl<'a> Hardware for RealtimeClock {
+impl Hardware for Clock {
     fn info(&self) -> &HardwareInfo {
         &self.hw_info
     }
 
-    fn hardware_interrupt(&mut self, a: u16, registers: &mut [u16], ram: &mut [u16]) -> usize {
+    fn hardware_interrupt(&mut self, vm: &mut VMExposed) -> usize {
+        let (a, c) = vm.read_register(Register::A);
+        let mut cycles = c;
         match a {
             0x0 => {
-                self.clock_rate = registers[Register::A as usize];
-                self.last_time = precise_time_s();
+                let (cr, c) = vm.read_register(Register::B);
+                self.clock_rate = cr;
+                self.last_cycles = vm.get_cycles();
+                cycles += c;
             },
             0x1 => {
-                registers[Register::C as usize] =
-                    ((precise_time_s() - self.last_time) *
-                     (60 as f64 / self.clock_rate as f64)) as u16;
+                let ticks = (((vm.get_cycles() - self.last_cycles) as f64 *
+                 (60 as f64 / self.clock_rate as f64))/vm.get_clock_rate() as f64) as u16;
+                cycles += vm.write_register(Register::C, ticks);
             },
-            0x2 => self.interrupt = registers[Register::B as usize],
+            0x2 => {
+                let (i, c) = vm.read_register(Register::B);
+                self.interrupt = i;
+                cycles += c;
+            },
             _ => return 0
         }
-        0
+        cycles
     }
 
-    fn update(&mut self, vm: &mut VirtualMachine) {
+    fn update(&mut self, vm: &mut VMExposed) {
         if self.clock_rate != 0 {
             if self.interrupt != 0 {
-                if precise_time_s() - self.last_interrupt > (60 as f64 / self.clock_rate as f64) {
+                if (vm.get_cycles() - self.last_interrupt) as f64 > vm.get_clock_rate() as f64 / (60 as f64 / self.clock_rate as f64) {
+                    self.last_interrupt = vm.get_cycles();
                     vm.interrupt(self.interrupt);
-                    self.last_interrupt = precise_time_s();
                 }
             }
         }
