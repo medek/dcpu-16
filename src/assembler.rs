@@ -62,7 +62,8 @@ fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
             else {
                 Ok((0x1f << shift, Some(*lit)))
             }
-        }
+        },
+        _ => unimplemented!()
     }
 }
 

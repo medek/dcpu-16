@@ -111,7 +111,7 @@ fn handle_special_op(inst: u16, next: Option<&u16>) -> DcpuResult<(Opcode, bool)
     }
 }
 
-pub fn disassm_one<'_, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(Opcode, usize)> where I: Iterator<Item=&'_ u16> {
+pub fn disassm_one<'a, I>(inst: u16, mut itr: &mut Peekable<I>) -> DcpuResult<(Opcode, usize)> where I: Iterator<Item=&'a u16> {
     let mut count:usize = 0;
     match inst & 0x1F {
         0x00 => {

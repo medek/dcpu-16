@@ -17,6 +17,9 @@ pub enum Operand {
     Ex,
     LiteralDeRef(u16),
     Literal(u16),
+    Label(String),
+    LabelDeref(String),
+    LabelPlusDeref(String, u16),
 }
 
 #[derive(Debug)]
@@ -101,6 +104,15 @@ impl Display for Operand {
             },
             Operand::Literal(n) => {
                 fmt.write_fmt(format_args!("{:#x}", n))
+            },
+            Operand::Label(ref s) => {
+                fmt.write_str(s)
+            },
+            Operand::LabelDeref(ref s) => {
+                fmt.write_str(s)
+            },
+            Operand::LabelPlusDeref(ref s, l) => {
+                fmt.write_fmt(format_args!("{}+{}", s, l))
             }
         }
     }

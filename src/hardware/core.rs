@@ -7,14 +7,13 @@ pub struct HardwareInfo {
     pub version:u16
 }
 
-pub type Hw = Hardware + Sized;
 pub trait Hardware {
     fn info(&self) -> &HardwareInfo;
     fn hardware_interrupt(&mut self, &mut VMExposed) -> usize;
     fn update(&mut self, &mut VMExposed);
 }
 
-impl Debug for Hardware + Sized {
+impl Debug for Hardware {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         fmt.write_str("TODO!")
     }
