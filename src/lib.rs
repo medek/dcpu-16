@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate nom;
 extern crate time;
 
 mod virtual_machine;
@@ -7,6 +9,7 @@ mod disassemble;
 mod result;
 mod mem_iterator;
 pub mod hardware;
+pub mod parser;
 
 pub use virtual_machine::*;
 pub use opcodes::*;
