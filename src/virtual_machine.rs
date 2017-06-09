@@ -6,7 +6,7 @@ use mem_iterator::MemIterator;
 use hardware::{Hardware};
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Register {
     A = 0,
     B,
