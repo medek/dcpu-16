@@ -15,7 +15,7 @@ pub enum Register {
     Y,
     Z,
     I,
-    J
+    J,
 }
 
 impl Register {
@@ -45,7 +45,7 @@ impl Display for Register {
             Register::Y => fmt.write_str("Y"),
             Register::Z => fmt.write_str("Z"),
             Register::I => fmt.write_str("I"),
-            Register::J => fmt.write_str("J")
+            Register::J => fmt.write_str("J"),
         }
     }
 }

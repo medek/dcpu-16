@@ -1,5 +1,6 @@
+extern crate pest;
 #[macro_use]
-extern crate nom;
+extern crate pest_derive;
 extern crate time;
 
 mod virtual_machine;

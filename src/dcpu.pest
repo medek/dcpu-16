@@ -1,0 +1,137 @@
+digit = {'0'..'9'}
+newline = _{ "\n" | "\r\n" }
+whitespace = _{ " " | "\t" | newline }
+comment = _{ ";" ~ (!newline ~ any)* }
+
+raw_string = { (!("\\" | "\"") ~ any)+ }
+predefined = { "n" | "r" | "t" | "\\" | "0" | "\"" | "'" }
+byte       = { "x" ~ hex ~ hex }
+escape     = { "\\" ~ (predefined | byte) }
+string = @{ "\"" ~ (raw_string | escape)* ~ "\"" }
+chr = @{ "'" ~ (escape | any) ~ "'" }
+
+hex = {'a'..'f' | 'A'..'F' | digit }
+bang = _{ "#" }
+colon = _{ ":" }
+push_operand = { "PUSH" }
+pop_operand = { "POP" }
+int_literal = @{ "-"? ~ digit ~ digit*}
+hex_literal = @{ bang ~ hex+}
+
+ident_char = { 'a'..'z' | 'A'..'Z' | '0'..'9' | "_" }
+ident =  @{
+    ('a'..'z' | 'A'..'Z') ~ ident_char* |
+    "_" ~ ident_char+
+}
+
+label_def = {colon ~ ident }
+
+register = { "A" | "B" | "C" | "X" | "Y" | "Z" | "I" | "J" | "PC" | "SP" | "EX" }
+
+deref = { "[" ~ (int_literal | hex_literal | register | ident) ~ "]" }
+
+operand = {
+	deref | int_literal | hex_literal | register | ident
+}
+
+db_operand = { int_literal | hex_literal | string | chr }
+
+op_db = {
+	^"DB" ~ db_operand ~ ("," ~ db_operand)* 
+}
+
+op_resb = {
+	^"RESB" ~ (int_literal | hex_literal)
+}
+
+op_set = { ^"SET" }
+op_add = { ^"ADD" }
+op_sub = { ^"SUB" }
+op_mul = { ^"MUL" }
+op_mli = { ^"MLI" }
+op_div = { ^"DIV" }
+op_dvi = { ^"DVI" }
+op_mod = { ^"MOD" }
+op_mdi = { ^"MDI" }
+op_and = { ^"AND" }
+op_bor = { ^"BOR" }
+op_xor = { ^"XOR" }
+op_shr = { ^"SHR" }
+op_asr = { ^"ASR" }
+op_shl = { ^"SHL" }
+op_ifb = { ^"IFB" }
+op_ifc = { ^"IFC" }
+op_ife = { ^"IFE" }
+op_ifn = { ^"IFN" }
+op_ifg = { ^"IFG" }
+op_ifa = { ^"IFA" }
+op_ifl = { ^"IFL" }
+op_ifu = { ^"IFU" }
+op_adx = { ^"ADX" }
+op_sbx = { ^"SBX" }
+op_sti = { ^"STI" }
+op_std = { ^"STD" }
+
+op_dbl = {
+	op_set |
+	op_sub |
+	op_mul |
+	op_mli |
+	op_div |
+	op_dvi |
+	op_mod |
+	op_mdi |
+	op_and |
+	op_bor |
+	op_xor |
+	op_shr |
+	op_asr |
+	op_shl |
+	op_ifb |
+	op_ifc |
+	op_ife |
+	op_ifn |
+	op_ifg |
+	op_ifa |
+	op_ifl |
+	op_ifu |
+	op_adx |
+	op_sbx |
+	op_sti |
+	op_std
+}
+
+op_jsr = { ^"JSR" }
+op_int = { ^"INT" }
+op_iag = { ^"IAG" }
+op_ias = { ^"IAS" }
+op_rfi = { ^"RFI" }
+op_iaq = { ^"IAQ" }
+op_hwn = { ^"HWN" }
+op_hwq = { ^"HWQ" }
+op_hwi = { ^"HWI" }
+
+op_sgl = {
+	op_jsr |
+	op_int |
+	op_iag |
+	op_rfi |
+	op_iaq |
+	op_hwn |
+	op_hwq |
+	op_hwi
+}
+
+opcode_double = {
+	op_dbl ~ (push_operand | operand) ~ "," ~ (pop_operand | operand)
+}
+
+opcode_single = {
+	op_sgl ~ operand
+}
+
+statement = { label_def | opcode_double | opcode_single | op_db | op_resb }
+statements = { statement+ }
+
+input = _{ soi ~ statements ~ eoi }
+
