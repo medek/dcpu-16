@@ -1,5 +1,6 @@
 use super::super::virtual_machine::{VMExposed, Register};
 use self::super::core::{Hardware, HardwareInfo};
+use std::fmt::{Formatter, Display, Error};
 
 pub struct Clock {
     hw_info: HardwareInfo,
@@ -63,5 +64,11 @@ impl Hardware for Clock {
                 }
             }
         }
+    }
+
+    fn debug_dump_state(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        fmt.write_fmt(
+            format_args!("clock rate: {}, last cycles: {}, interrupt: {:02x}, last interrupt: {}",
+                self.clock_rate, self.last_cycles, self.interrupt, self.last_interrupt))
     }
 }

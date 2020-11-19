@@ -1,47 +1,44 @@
-digit = {'0'..'9'}
-newline = _{ "\n" | "\r\n" }
-whitespace = _{ " " | "\t" | newline }
-comment = _{ ";" ~ (!newline ~ any)* }
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* }
 
-raw_string = { (!("\\" | "\"") ~ any)+ }
+raw_string = { (!("\\" | "\"") ~ ANY)+ }
 predefined = { "n" | "r" | "t" | "\\" | "0" | "\"" | "'" }
-byte       = { "x" ~ hex ~ hex }
+byte       = { "x" ~ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT }
 escape     = { "\\" ~ (predefined | byte) }
 string = @{ "\"" ~ (raw_string | escape)* ~ "\"" }
-chr = @{ "'" ~ (escape | any) ~ "'" }
+chr = @{ "'" ~ (escape | ANY) ~ "'" }
 
-hex = {'a'..'f' | 'A'..'F' | digit }
-bang = _{ "#" }
+hash = _{ "#" }
+comma = _{ "," }
+hex_start = _{ hash | ^"0x" }
+hex_body = { (ASCII_HEX_DIGIT)+ }
 colon = _{ ":" }
-push_operand = { "PUSH" }
-pop_operand = { "POP" }
-int_literal = @{ "-"? ~ digit ~ digit*}
-hex_literal = @{ bang ~ hex+}
+push_operand = { ^"PUSH" }
+pop_operand = { ^"POP" }
+int_literal = @{ "-"? ~ ASCII_DIGIT+ }
+hex_literal = ${ hex_start ~ hex_body }
 
-ident_char = { 'a'..'z' | 'A'..'Z' | '0'..'9' | "_" }
+ident_char = { ('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" }
 ident =  @{
-    ('a'..'z' | 'A'..'Z') ~ ident_char* |
-    "_" ~ ident_char+
+    ("_" | ('a'..'z' | 'A'..'Z')) ~ (ident_char)* 
 }
 
-label_def = {colon ~ ident }
+label_def = ${colon ~ ident }
 
-register = { "A" | "B" | "C" | "X" | "Y" | "Z" | "I" | "J" | "PC" | "SP" | "EX" }
+pc = { ^"PC" }
+sp = { ^"SP" }
+ex = { ^"EX" }
 
-deref = { "[" ~ (int_literal | hex_literal | register | ident) ~ "]" }
+register = { (^"A" | ^"B" | ^"C" | ^"X" | ^"Y" | ^"Z" | ^"I" | ^"J" | pc | sp | ex) }
+
+register_plus_deref = { (register) ~ "+" ~ (hex_literal | int_literal | ident) }
+literal_deref = { (hex_literal | int_literal | ident) }
+ident_plus_deref = { (ident) ~ "+" ~ (hex_literal | int_literal | ident) }
+
+deref = { "[" ~ (register_plus_deref | register | ident_plus_deref | literal_deref) ~ "]" }
 
 operand = {
-	deref | int_literal | hex_literal | register | ident
-}
-
-db_operand = { int_literal | hex_literal | string | chr }
-
-op_db = {
-	^"DB" ~ db_operand ~ ("," ~ db_operand)* 
-}
-
-op_resb = {
-	^"RESB" ~ (int_literal | hex_literal)
+	(deref | hex_literal | int_literal | register | ident)
 }
 
 op_set = { ^"SET" }
@@ -72,7 +69,7 @@ op_sbx = { ^"SBX" }
 op_sti = { ^"STI" }
 op_std = { ^"STD" }
 
-op_dbl = {
+op_dbl = _{
 	op_set |
 	op_sub |
 	op_mul |
@@ -111,7 +108,7 @@ op_hwn = { ^"HWN" }
 op_hwq = { ^"HWQ" }
 op_hwi = { ^"HWI" }
 
-op_sgl = {
+op_sgl = _{
 	op_jsr |
 	op_int |
 	op_iag |
@@ -123,15 +120,15 @@ op_sgl = {
 }
 
 opcode_double = {
-	op_dbl ~ (push_operand | operand) ~ "," ~ (pop_operand | operand)
+	(op_dbl) ~ (push_operand | operand) ~ comma ~ (pop_operand | operand)
 }
 
 opcode_single = {
-	op_sgl ~ operand
+	(op_sgl) ~ (operand)
 }
 
-statement = { label_def | opcode_double | opcode_single | op_db | op_resb }
-statements = { statement+ }
+statement = _{ label_def | opcode_double | opcode_single }
+statements = _{ statement+ }
 
-input = _{ soi ~ statements ~ eoi }
+input = _{ SOI ~ statements ~ EOI }
 

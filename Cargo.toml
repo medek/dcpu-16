@@ -5,18 +5,12 @@ authors = ["Gavin Massey <mdk@mystacktrace.org>"]
 
 [dependencies]
 clap = "0.8.4"
-pest = "^1.0"
-pest_derive = "^1.0"
+pest = { version = "2.1.3", optional = true }
+pest_derive = { version = "2.1.0", optional = true}
 time = "0.1.32"
+thiserror = "1.0"
 
-[lib]
-name="dcpu16"
-path="src/lib.rs"
-
-[[bin]]
-name="dcpu_assembler"
-path="src/dcpu_assembler/main.rs"
-
-[[bin]]
-name="emulator"
-path="src/emulator/main.rs"
+[features]
+default = ["parser", "assembler"]
+assembler =  ["parser"]
+parser = ["pest", "pest_derive"]
