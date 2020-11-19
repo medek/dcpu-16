@@ -1,15 +1,22 @@
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
 extern crate time;
+extern crate thiserror;
 
 mod virtual_machine;
 mod opcodes;
-mod assembler;
+#[cfg(feature = "assembly")]
+mod assembly;
 mod disassemble;
-mod result;
 mod mem_iterator;
 pub mod hardware;
+#[cfg(feature = "parser")]
+pub mod parser;
 
 pub use virtual_machine::*;
 pub use opcodes::*;
-pub use assembler::*;
+#[cfg(feature = "assembly")]
+pub use assembly::*;
+
 pub use disassemble::*;
-pub use result::*;

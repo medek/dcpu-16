@@ -1,12 +1,30 @@
 use std::fmt::{Display, Formatter, Error};
 use opcodes::{Opcode, Operand};
-use result::{DcpuResult, DcpuError, DcpuErrorKind};
-use disassemble::disassm_one;
+use disassemble::{disassm_one, DcpuDisassmError};
 use mem_iterator::MemIterator;
 use hardware::{Hardware};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum DcpuVMError {
+    #[error("Invalid operand A. Cannot put PUSH there.")]
+    PushInAOp,
+    #[error("Invalid operand B. Cannot put POP there.")]
+    PopInBOp,
+    #[error("0x00 isn't a valid instruction")]
+    EmptyInstruction,
+    #[error("Address out of bounds. Maybe external hardware tried to read too much RAM")]
+    OutOfBoundsMemory,
+    #[error("Shit's on fire, yo!")]
+    OnFire,
+    #[error("Someone passed in an empty iterator!")]
+    EmptyIterator,
+    #[error("Disassembly error: {}", .0)]
+    DisassemblyFailed(#[from]DcpuDisassmError)
+}
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Register {
     A = 0,
     B,
@@ -15,13 +33,14 @@ pub enum Register {
     Y,
     Z,
     I,
-    J
+    J,
 }
 
 impl Register {
-    fn from_str(s: &[u8]) -> Option<Register> {
-        if s.len() > 1 { return None }
-        match s[0] {
+    pub fn from_str(s: &String) -> Option<Register> {
+        if s.len() > 1 || s.len() == 0 { return None }
+        let u = s.to_uppercase();
+        match u.as_str().as_bytes()[0] {
             b'A' => Some(Register::A),
             b'B' => Some(Register::B),
             b'C' => Some(Register::C),
@@ -45,7 +64,7 @@ impl Display for Register {
             Register::Y => fmt.write_str("Y"),
             Register::Z => fmt.write_str("Z"),
             Register::I => fmt.write_str("I"),
-            Register::J => fmt.write_str("J")
+            Register::J => fmt.write_str("J"),
         }
     }
 }
@@ -67,7 +86,7 @@ pub struct VirtualMachine {
     ia: u16,
     ex: u16,
     dead_zone: u16, //where writing to literals goes to die
-    hardware: Vec<Box<Hardware>>,
+    hardware: Vec<Box<dyn Hardware>>,
     in_interrupt: bool,
     iaq: bool,
     on_fire: bool
@@ -99,7 +118,7 @@ impl<'r> VirtualMachine {
             ia: 0,
             ex: 0,
             dead_zone: 0,
-            hardware: Vec::<Box<Hardware>>::new(),
+            hardware: Vec::<Box<dyn Hardware>>::new(),
             iaq: false,
             in_interrupt: false,
             on_fire: false
@@ -117,14 +136,14 @@ impl<'r> VirtualMachine {
         ret
     }
 
-    fn resolve_memory_read(&mut self, op: &Operand) -> DcpuResult<(u16, usize)> {
+    fn resolve_memory_read(&mut self, op: &Operand) -> Result<(u16, usize), DcpuVMError> {
         match *op {
             Operand::Register(reg) => Ok(((*(self.exposed.registers))[reg as usize], 0)),
-            Operand::RegisterDeRef(reg) => {
+            Operand::RegisterDeref(reg) => {
                 let addr = (*(self.exposed.registers))[reg as usize];
                 Ok(((*(self.exposed.ram))[addr as usize], 0))
             },
-            Operand::RegisterPlusDeRef(reg, plus) => {
+            Operand::RegisterPlusDeref(reg, plus) => {
                 let addr = (*(self.exposed.registers))[reg as usize] + plus;
                 Ok(((*(self.exposed.ram))[addr as usize], 1))
             },
@@ -143,7 +162,7 @@ impl<'r> VirtualMachine {
             Operand::Ex => {
                 Ok((self.ex, 0))
             },
-            Operand::LiteralDeRef(n) => {
+            Operand::LiteralDeref(n) => {
                 Ok(((*(self.exposed.ram))[n as usize], 1))
             },
             Operand::Literal(n) => {
@@ -154,20 +173,20 @@ impl<'r> VirtualMachine {
                 Ok((n, 0))
             },
             Operand::Push => {
-                Err(DcpuError{reason: DcpuErrorKind::PushInAOp})
+                Err(DcpuVMError::PushInAOp)
             },
             _ => unreachable!()
         }
     }
 
-    fn resolve_memory_write(&'r mut self, op: &Operand) -> DcpuResult<(&'r mut u16, usize)> {
+    fn resolve_memory_write(&'r mut self, op: &Operand) -> Result<(&'r mut u16, usize), DcpuVMError> {
         match *op {
             Operand::Register(reg) => Ok((&mut (*(self.exposed.registers))[reg as usize], 0)),
-            Operand::RegisterDeRef(reg) => {
+            Operand::RegisterDeref(reg) => {
                 let addr = (*(self.exposed.registers))[reg as usize];
                 Ok((&mut(*(self.exposed.ram))[addr as usize], 0))
             },
-            Operand::RegisterPlusDeRef(reg, plus) => {
+            Operand::RegisterPlusDeref(reg, plus) => {
                 let addr = (*(self.exposed.registers))[reg as usize] + plus;
                 Ok((&mut (*(self.exposed.ram))[addr as usize], 1))
             },
@@ -186,14 +205,14 @@ impl<'r> VirtualMachine {
             Operand::Ex => {
                 Ok((&mut self.ex, 0))
             },
-            Operand::LiteralDeRef(n) => {
+            Operand::LiteralDeref(n) => {
                 Ok((&mut (*(self.exposed.ram))[n as usize], 1))
             },
             Operand::Literal(_) => {
                 Ok((&mut self.dead_zone, 1))
             },
             Operand::Pop => {
-                Err(DcpuError{reason: DcpuErrorKind::PopInBOp})
+                Err(DcpuVMError::PopInBOp)
             },
             Operand::Push => {
                 self.sp = ((self.sp as u32 - 1) & 0xFFFF) as u16;
@@ -204,7 +223,7 @@ impl<'r> VirtualMachine {
         }
     }
 
-    fn skip(&'r mut self, off: usize) -> DcpuResult<(usize, usize)> {
+    fn skip(&'r mut self, off: usize) -> Result<(usize, usize), DcpuVMError> {
         let mut skipped:usize = 0;
         let mut count:usize = 0;
         let mut itr = MemIterator::new(&*self.exposed.ram, off + self.pc as usize, 0xFFFF).peekable();
@@ -212,10 +231,10 @@ impl<'r> VirtualMachine {
         loop {
             let inst = match itr.next() {
                 Some(i) => *i,
-                None => return Err(DcpuError{reason: DcpuErrorKind::EmptyIterator})
+                None => return Err(DcpuVMError::EmptyIterator)
             };
             let o = inst & 0x1f;
-            let (_, c) = try!(disassm_one(inst, &mut itr));
+            let (_, c) = disassm_one(inst, &mut itr)?;
             count += c + 1;
             skipped += 1;
             if o < 0x10 && o > 0x17 { break; }
@@ -224,13 +243,13 @@ impl<'r> VirtualMachine {
         Ok((skipped, count))
     }
 
-    fn handle_interrupts(&'r mut self) -> DcpuResult<usize> {
+    fn handle_interrupts(&'r mut self) -> Result<usize, DcpuVMError> {
         if self.ia == 0  || self.iaq {
             return Ok(0)
         }
 
         if self.on_fire {
-            return Err(DcpuError{reason: DcpuErrorKind::OnFire})
+            return Err(DcpuVMError::OnFire)
         }
 
         if self.exposed.interrupts.len() == 0 {
@@ -248,23 +267,23 @@ impl<'r> VirtualMachine {
         self.step()
     }
 
-    fn get_instruction(&'r mut self) -> DcpuResult<(Opcode, usize)> {
+    fn get_instruction(&'r mut self) -> Result<(Opcode, usize), DcpuVMError> {
         let mut itr = MemIterator::new(&*self.exposed.ram, self.pc as usize, 0xFFFF).peekable();
         let inst = match itr.next() {
             Some(i) => *i,
-            None => return Err(DcpuError{reason: DcpuErrorKind::EmptyIterator})
+            None => return Err(DcpuVMError::EmptyIterator)
         };
-        disassm_one(inst, &mut itr)
+        Ok(disassm_one(inst, &mut itr)?)
     }
 
-    pub fn step(&'r mut self) -> DcpuResult<usize> {
+    pub fn step(&'r mut self) -> Result<usize, DcpuVMError> {
         let mut cycles:usize = 0;
-        let (op, count) = try!(self.get_instruction());
+        let (op, count) = self.get_instruction()?;
         match op {
             Opcode::SET(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 *dst = src;
                 cycles += c + 1;
             },
@@ -272,9 +291,9 @@ impl<'r> VirtualMachine {
                 let res:u32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     res = *dst as u32 + src as u32;
                     *dst = (res & 0xFFFF) as u16;
@@ -288,9 +307,9 @@ impl<'r> VirtualMachine {
                 let res:i32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     res = *dst as i32 - src as i32;
                     *dst = (res & 0xFFFF) as u16;
@@ -304,9 +323,9 @@ impl<'r> VirtualMachine {
                 let res:u32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     res = *dst as u32 * src as u32;
                     *dst = (res & 0xFFFF) as u16;
@@ -317,9 +336,9 @@ impl<'r> VirtualMachine {
                 let res:i32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     res = (*dst as i16) as i32 * ((src as i16) as i32);
                     *dst = (res & 0xFFFF) as u16;
@@ -330,9 +349,9 @@ impl<'r> VirtualMachine {
                 let res:u32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 3;
                     if src == 0 {
                         res = 0;
@@ -349,9 +368,9 @@ impl<'r> VirtualMachine {
                 let res:i32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 3;
                     if src == 0 {
                         res = 0;
@@ -365,9 +384,9 @@ impl<'r> VirtualMachine {
                 self.ex = res as u16;
             },
             Opcode::MOD(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 cycles += c + 3;
                 if src == 0 {
                     *dst = 0;
@@ -378,9 +397,9 @@ impl<'r> VirtualMachine {
                 }
             },
             Opcode::MDI(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 cycles += c + 3;
                 if src == 0 {
                     *dst = 0;
@@ -391,32 +410,32 @@ impl<'r> VirtualMachine {
                 }
             },
             Opcode::AND(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 cycles += c + 1;
                 *dst = *dst & src;
             },
             Opcode::BOR(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 cycles += c + 1;
                 *dst = *dst | src;
             },
             Opcode::XOR(ref b, ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c;
-                let (dst, c) = try!(self.resolve_memory_write(b));
+                let (dst, c) = self.resolve_memory_write(b)?;
                 cycles += c + 1;
                 *dst = *dst ^ src;
             },
             Opcode::SHR(ref b, ref a) => {
                 let res:u32;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 1;
                     *dst = *dst >> src;
                     res = ((*dst as u32) << 16)>> (src as u32) & 0xFFFF;
@@ -426,9 +445,9 @@ impl<'r> VirtualMachine {
             Opcode::ASR(ref b, ref a) => {
                 let res:i32;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 1;
                     *dst = ((*dst as i16) >> src) as u16;
                     res = (((*dst as i32) << src as i32)>> 16) & 0xFFFF;
@@ -438,9 +457,9 @@ impl<'r> VirtualMachine {
             Opcode::SHL(ref b, ref a) => {
                 let res:u32;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 1;
                     *dst = *dst << src;
                     res = (((*dst as u32) << (src as u32)) >> 16) & 0xFFFF;
@@ -451,15 +470,15 @@ impl<'r> VirtualMachine {
             Opcode::IFB(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst & src != 0;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -468,15 +487,15 @@ impl<'r> VirtualMachine {
             Opcode::IFC(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst & src == 0;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -485,15 +504,15 @@ impl<'r> VirtualMachine {
             Opcode::IFE(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst == src;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -502,15 +521,15 @@ impl<'r> VirtualMachine {
             Opcode::IFN(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst != src;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -519,15 +538,15 @@ impl<'r> VirtualMachine {
             Opcode::IFG(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst > src;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -536,15 +555,15 @@ impl<'r> VirtualMachine {
             Opcode::IFA(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = (*dst as i16) > (src as i16);
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -553,15 +572,15 @@ impl<'r> VirtualMachine {
             Opcode::IFL(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = *dst < src;
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -570,15 +589,15 @@ impl<'r> VirtualMachine {
             Opcode::IFU(ref b, ref a) => {
                 let pass:bool;
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     pass = (*dst as i16) < (src as i16);
                 }
 
                 if !pass {
-                    let (skip, c) = try!(self.skip(count + 1));
+                    let (skip, c) = self.skip(count + 1)?;
 
                     cycles += skip + 1; // +1 cause failed
                     self.pc =  (self.pc + (c as u16)) & 0xFFFF;
@@ -588,9 +607,9 @@ impl<'r> VirtualMachine {
                 let mut res:u32 = self.ex as u32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 3;
                     res += *dst as u32 + src as u32;
                     *dst = (res & 0xFFFF) as u16;
@@ -604,9 +623,9 @@ impl<'r> VirtualMachine {
                 let mut res:i32 = self.ex as i32;
 
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 3;
                     res = *dst as i32 - (src as i32 + res);
                     *dst = (res & 0xFFFF) as u16;
@@ -618,9 +637,9 @@ impl<'r> VirtualMachine {
             },
             Opcode::STI(ref b, ref a) => {
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     *dst = src;
                 }
@@ -629,9 +648,9 @@ impl<'r> VirtualMachine {
             },
             Opcode::STD(ref b, ref a) => {
                 {
-                    let (src, c) = try!(self.resolve_memory_read(a));
+                    let (src, c) = self.resolve_memory_read(a)?;
                     cycles += c;
-                    let (dst, c) = try!(self.resolve_memory_write(b));
+                    let (dst, c) = self.resolve_memory_write(b)?;
                     cycles += c + 2;
                     *dst = src;
                 }
@@ -640,24 +659,24 @@ impl<'r> VirtualMachine {
             },
             Opcode::JSR(ref a) => {
                 let x:u16 = ((self.pc as u32 + count as u32 + 1) & 0xFFFF) as u16;
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 3;
                 self.push_stack(x);
                 self.pc = src;
             },
             Opcode::INT(ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 4;
                 self.interrupt(src);
             },
             Opcode::IAG(ref a) => {
                 let ia:u16 = self.ia;
-                let (dst, c) = try!(self.resolve_memory_write(a));
+                let (dst, c) = self.resolve_memory_write(a)?;
                 cycles += c + 1;
                 *dst = ia;
             },
             Opcode::IAS(ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 1;
                 self.ia = src;
             },
@@ -669,18 +688,18 @@ impl<'r> VirtualMachine {
                 cycles += 3;
             },
             Opcode::IAQ(ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 2;
                 self.iaq = src != 0;
             },
             Opcode::HWN(ref a) => {
                 let hw_count:u16 = self.hardware.len() as u16;
-                let (dst, c) = try!(self.resolve_memory_write(a));
+                let (dst, c) = self.resolve_memory_write(a)?;
                 cycles += c + 2;
                 *dst = hw_count;
             },
             Opcode::HWQ(ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 4;
                 if (src as usize) < self.hardware.len() {
                     let hw_info = self.hardware[src as usize].info();
@@ -692,7 +711,7 @@ impl<'r> VirtualMachine {
                 }
             },
             Opcode::HWI(ref a) => {
-                let (src, c) = try!(self.resolve_memory_read(a));
+                let (src, c) = self.resolve_memory_read(a)?;
                 cycles += c + 4;
                 cycles += self.hardware[src as usize].hardware_interrupt(&mut self.exposed);
             },
@@ -701,7 +720,7 @@ impl<'r> VirtualMachine {
         self.pc = ((self.pc as u32 + (count as u32) + 1) & 0xFFFF) as u16;
 
         if !self.in_interrupt {
-            cycles += try!(self.handle_interrupts());
+            cycles += self.handle_interrupts()?;
         }
         Ok(cycles)
     }
@@ -727,7 +746,7 @@ impl<'r> VirtualMachine {
         self
     }
 
-    pub fn attach_hardware(mut self, hardware: Box<Hardware>) -> Self {
+    pub fn attach_hardware(mut self, hardware: Box<dyn Hardware>) -> Self {
         if self.hardware.len() == 0xFFFF {
             return self
         }
@@ -822,9 +841,9 @@ impl VMExposed {
         2 //SET REG, LITERAL
     }
 
-    pub fn read_ram<'r> (&'r mut self, pos: usize, size: usize) -> DcpuResult<(&'r [u16], usize)> {
+    pub fn read_ram<'r> (&'r mut self, pos: usize, size: usize) -> Result<(&'r [u16], usize), DcpuVMError> {
         if pos + size > 0xFFFF {
-            return Err(DcpuError{reason: DcpuErrorKind::OutOfBoundsMemory});
+            return Err(DcpuVMError::OutOfBoundsMemory);
         }
         Ok((&self.ram[(pos) .. (pos + size)], size * 3))
     }
@@ -841,4 +860,3 @@ impl VMExposed {
         i * 3 //SET [NEXT], LITERAL
     }
 }
-

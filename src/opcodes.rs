@@ -1,13 +1,12 @@
-/* use 32 bits for args so we can embed extra information and whatnot */
 use std::fmt::{Display, Formatter, Error};
 use virtual_machine::Register;
-use result::DcpuResult;
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Operand {
     Register(Register),
-    RegisterDeRef(Register),
-    RegisterPlusDeRef(Register, u16),
+    RegisterDeref(Register),
+    RegisterPlusDeref(Register, u16),
+    RegisterPlusLabelDeref(Register, String),
     Push,
     Pop,
     Peek,
@@ -15,14 +14,15 @@ pub enum Operand {
     Sp,
     Pc,
     Ex,
-    LiteralDeRef(u16),
     Literal(u16),
+    LiteralDeref(u16),
     Label(String),
     LabelDeref(String),
     LabelPlusDeref(String, u16),
+    LabelPlusLabelDeref(String, String),
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Opcode {
     SET(Operand, Operand), // SET b, a -> b = a
     ADD(Operand, Operand), // ADD b, a -> b = b+a
@@ -62,21 +62,20 @@ pub enum Opcode {
     HWI(Operand)
 }
 
-pub trait Disassemble {
-    fn disassm(&self) -> DcpuResult<Vec<Opcode>>;
-}
-
 impl Display for Operand {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         match *self {
             Operand::Register(reg) => {
                 reg.fmt(fmt)
             },
-            Operand::RegisterDeRef(reg) => {
+            Operand::RegisterDeref(reg) => {
                 fmt.write_fmt(format_args!("[{}]", reg))
             },
-            Operand::RegisterPlusDeRef(reg, n) => {
+            Operand::RegisterPlusDeref(reg, n) => {
                 fmt.write_fmt(format_args!("[{} + {:#x}]", reg, n))
+            },
+            Operand::RegisterPlusLabelDeref(reg, ref s) => {
+                fmt.write_fmt(format_args!("[{} + {}]", reg, s))
             },
             Operand::Push => {
                 fmt.write_str("PUSH")
@@ -99,7 +98,7 @@ impl Display for Operand {
             Operand::Ex => {
                 fmt.write_str("EX")
             },
-            Operand::LiteralDeRef(n) => {
+            Operand::LiteralDeref(n) => {
                 fmt.write_fmt(format_args!("[{:#x}]", n))
             },
             Operand::Literal(n) => {
@@ -112,7 +111,10 @@ impl Display for Operand {
                 fmt.write_str(s)
             },
             Operand::LabelPlusDeref(ref s, l) => {
-                fmt.write_fmt(format_args!("{}+{}", s, l))
+                fmt.write_fmt(format_args!("[{}+{}]", s, l))
+            },
+            Operand::LabelPlusLabelDeref(ref s, ref l) => {
+                fmt.write_fmt(format_args!("[{}+{}]", s, l))
             }
         }
     }
