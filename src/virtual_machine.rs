@@ -788,7 +788,7 @@ impl<'r> VirtualMachine {
     }
 
     pub fn update_hardware(&mut self) {
-        for mut hw in &mut self.hardware {
+        for hw in &mut self.hardware {
             hw.update(&mut self.exposed);
         }
     }

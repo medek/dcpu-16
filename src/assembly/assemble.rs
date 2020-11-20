@@ -1,8 +1,18 @@
 use opcodes::{Opcode, Operand};
-use result::{DcpuError, DcpuResult, DcpuErrorKind};
+use thiserror::Error;
+
+#[derive(Debug, PartialEq, Error)]
+pub enum AssemblyError {
+    #[error("Invalid operand A. Cannot put PUSH there.")]
+    PushInAOp,
+    #[error("Invalid operand B. Cannot put POP there.")]
+    PopInBOp,
+    #[error("Label not resolved to literal yet: {}", .0)]
+    CannotAssembleLabels(String)
+}
 
 pub trait Assemble {
-    fn assem(&self) -> DcpuResult<Vec<u16>>;
+    fn assemble(&self) -> Result<Vec<u16>, AssemblyError>;
 }
 
 fn is_short_literal(n: u16) -> bool {
@@ -12,10 +22,10 @@ fn is_short_literal(n: u16) -> bool {
 
 // 0x20-0x3f = -1 to 30 (0xFFFF to 0x1e) for a part
 fn to_short_literal(n: u16) -> u16 {
-        (0x21 + (n as i16)) as u16
+        (0x21u32 + (n as u32)) as u16
 }
 
-fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
+fn build_operand(is_a: bool, op: &Operand) -> Result<(u16, Option<u16>), AssemblyError> {
     let shift = match is_a {
         true => 10,
         false => 5
@@ -23,16 +33,16 @@ fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
     match *op {
         Operand::Register(ref reg) =>
             Ok(((*reg as u16) << shift, None)),
-        Operand::RegisterDeRef(ref reg) =>
+        Operand::RegisterDeref(ref reg) =>
             Ok(((*reg as u16 + 0x8) << shift, None)),
-        Operand::RegisterPlusDeRef(ref reg, ref lit) =>
+        Operand::RegisterPlusDeref(ref reg, ref lit) =>
             Ok(((*reg as u16 + 0x10) << shift, Some(*lit))),
         Operand::Pop => {
             if is_a {
                 Ok((0x18 << shift, None))
             }
             else {
-                Err(DcpuError{reason:DcpuErrorKind::PopInBOp})
+                Err(AssemblyError::PopInBOp)
             }
         },
         Operand::Push => {
@@ -40,7 +50,7 @@ fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
                 Ok((0x18 << shift, None))
             }
             else {
-                Err(DcpuError{reason:DcpuErrorKind::PushInAOp})
+                Err(AssemblyError::PushInAOp)
             }
         },
         Operand::Peek =>
@@ -53,7 +63,7 @@ fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
             Ok((0x1c << shift, None)),
         Operand::Ex =>
             Ok((0x1d << shift, None)),
-        Operand::LiteralDeRef(ref lit) =>
+        Operand::LiteralDeref(ref lit) =>
             Ok((0x1e << shift, Some(*lit))),
         Operand::Literal(ref lit) => {
             if is_a && is_short_literal(*lit) {
@@ -63,11 +73,23 @@ fn build_operand(is_a: bool, op: &Operand) -> DcpuResult<(u16, Option<u16>)> {
                 Ok((0x1f << shift, Some(*lit)))
             }
         },
+        Operand::Label(ref s) => {
+            Err(AssemblyError::CannotAssembleLabels(s.clone()))
+        },
+        Operand::LabelDeref(ref s) => {
+            Err(AssemblyError::CannotAssembleLabels(s.clone()))
+        },
+        Operand::LabelPlusDeref(ref s, _) => {
+            Err(AssemblyError::CannotAssembleLabels(s.clone()))
+        },
+        Operand::LabelPlusLabelDeref(ref s1, ref _s2) => {
+            Err(AssemblyError::CannotAssembleLabels(s1.clone()))
+        },
         _ => unimplemented!()
     }
 }
 
-fn build_op(opcode: u16, b: &Operand, a: &Operand) -> DcpuResult<Vec<u16>> {
+fn build_op(opcode: u16, b: &Operand, a: &Operand) -> Result<Vec<u16>, AssemblyError> {
     let mut op = opcode & 0x1f;
     let mut ret = Vec::<u16>::new();
 
@@ -92,7 +114,7 @@ fn build_op(opcode: u16, b: &Operand, a: &Operand) -> DcpuResult<Vec<u16>> {
     Ok(ret)
 }
 
-fn build_special_op(opcode: u16, a: &Operand) -> DcpuResult<Vec<u16>> {
+fn build_special_op(opcode: u16, a: &Operand) -> Result<Vec<u16>, AssemblyError> {
     let mut op = (opcode & 0x1f) << 5 ;
     let mut ret = Vec::<u16>::new();
 
@@ -109,7 +131,7 @@ fn build_special_op(opcode: u16, a: &Operand) -> DcpuResult<Vec<u16>> {
 }
 
 impl Assemble for Opcode {
-    fn assem(&self) -> DcpuResult<Vec<u16>> {
+    fn assemble(&self) -> Result<Vec<u16>, AssemblyError> {
         match *self {
             Opcode::SET(ref b, ref a) => build_op(0x01, b, a),
             Opcode::ADD(ref b, ref a) => build_op(0x02, b, a),
@@ -151,3 +173,12 @@ impl Assemble for Opcode {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn short_literal() {
+        assert_eq!(build_operand(true, &Operand::Literal(0xFFFF)), Ok((0x20<<10, None)))
+    }
+}

@@ -1,4 +1,5 @@
 use pest::Parser;
+#[allow(unused_imports)]
 use pest::error::Error;
 use pest::iterators::Pair;
 use virtual_machine::Register as VMRegister;

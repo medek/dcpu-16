@@ -1,6 +1,6 @@
 use super::super::virtual_machine::{VMExposed, Register};
 use self::super::core::{Hardware, HardwareInfo};
-use std::fmt::{Formatter, Display, Error};
+use std::fmt::{Formatter, Error};
 
 pub struct Clock {
     hw_info: HardwareInfo,

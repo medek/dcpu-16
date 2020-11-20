@@ -11,6 +11,6 @@ time = "0.1.32"
 thiserror = "1.0"
 
 [features]
-default = ["parser", "assembler"]
-assembler =  ["parser"]
+default = ["assembly"]
+assembly =  ["parser"]
 parser = ["pest", "pest_derive"]

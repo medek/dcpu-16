@@ -8,7 +8,6 @@ pub struct HardwareInfo {
     pub version:u16
 }
 
-
 impl Display for HardwareInfo {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
             f.write_fmt(format_args!("Manufacturer ID: {:04x}, Model: {:04x}, Version: {:02x}",
@@ -21,6 +20,12 @@ pub trait Hardware {
     fn hardware_interrupt(&mut self, &mut VMExposed) -> usize;
     fn update(&mut self, &mut VMExposed);
     fn debug_dump_state(&self, fmt: &mut Formatter) -> Result<(), Error>;
+}
+
+impl Display for dyn Hardware {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        fmt.write_fmt(format_args!("{}", self.info()))
+    }
 }
 
 impl Debug for dyn Hardware {
