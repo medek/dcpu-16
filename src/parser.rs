@@ -24,7 +24,7 @@ pub enum ParseError {
     InvalidDeref(String)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     LabelDef(String),
     Instruction(Opcode),
@@ -516,7 +516,14 @@ mod tests {
             ]
         };
         let mut pairs = DcpuParser::parse(Rule::input, "SET [some_label], #10").unwrap();
-        assert_eq!(emit_opcode_double(pairs.next().unwrap()), Ok(Statement::Instruction(Opcode::SET(Operand::LabelDeref("some_label".to_string()), Operand::Literal(0x10)))));
+        assert_eq!(emit_opcode_double(pairs.next().unwrap()),
+                Ok(Statement::Instruction(
+                        Opcode::SET(
+                            Operand::LabelDeref("some_label".to_string()),
+                            Operand::Literal(0x10))
+                        )
+                    )
+        );
     }
     #[test]
     fn operand() {
